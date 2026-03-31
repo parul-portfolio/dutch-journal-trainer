@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dutch Journal Trainer</title>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --green:       #2d6a4f;
+  --green-light: #d8f3dc;
+  --green-dark:  #1b4332;
+  --bg:          #f6f7f3;
+  --surface:     #ffffff;
+  --border:      #e2e4dd;
+  --text:        #1c1e1a;
+  --muted:       #6b7068;
+  --hint:        #a0a49c;
+  --red:         #c1121f;
+  --red-light:   #fde8ea;
+  --amber:       #9a6b00;
+  --amber-light: #fff8e1;
+  --radius:      10px;
+  --radius-sm:   6px;
+}
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  min-height: 100vh; padding: 2rem 1rem 4rem; font-size: 15px; line-height: 1.5;
+}
+.wrap { max-width: 800px; margin: 0 auto; }
+header { text-align: center; margin-bottom: 2.5rem; }
+header h1 { font-size: 1.9rem; font-weight: 700; letter-spacing: -0.02em; color: var(--green-dark); }
+header p  { color: var(--muted); margin-top: 5px; font-size: 0.92rem; }
+.banner {
+  background: var(--amber-light); border: 1px solid #f0d98a;
+  border-radius: var(--radius); padding: 0.85rem 1.2rem;
+  margin-bottom: 1.5rem; font-size: 0.875rem; color: var(--amber); display: none;
+}
+.banner code { background: rgba(0,0,0,.07); padding: 1px 5px; border-radius: 3px; font-size: 0.82rem; }
+.banner a { color: var(--amber); font-weight: 600; }
+.tabs { display: flex; border-bottom: 1.5px solid var(--border); margin-bottom: 1.75rem; gap: 2px; }
+.tab {
+  padding: 9px 20px; font-size: 0.88rem; font-weight: 500;
+  cursor: pointer; border: none; background: transparent;
+  color: var(--muted); border-bottom: 2.5px solid transparent; margin-bottom: -1.5px;
+  transition: color .15s, border-color .15s;
+}
+.tab.active { color: var(--green-dark); border-bottom-color: var(--green); }
+.tab:hover:not(.active) { color: var(--text); }
+.panel { display: none; } .panel.active { display: block; }
+.field-label {
+  display: block; font-size: 0.75rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .07em; color: var(--hint); margin-bottom: 7px;
+}
+textarea {
+  width: 100%; min-height: 160px; padding: 13px 15px;
+  font-size: 1rem; font-family: Georgia, serif;
+  border: 1px solid var(--border); border-radius: var(--radius);
+  background: var(--surface); color: var(--text); resize: vertical; line-height: 1.75;
+  transition: border-color .15s;
+}
+textarea:focus { outline: none; border-color: var(--green); box-shadow: 0 0 0 3px rgba(45,106,79,.1); }
+.row { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; }
+.word-count { font-size: 0.8rem; color: var(--hint); }
+.btn {
+  padding: 9px 20px; font-size: 0.88rem; font-weight: 600;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text);
+  cursor: pointer; transition: all .15s; white-space: nowrap;
+}
+.btn:hover  { background: var(--bg); }
+.btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+.btn.primary { background: var(--green); color: #fff; border-color: var(--green); }
+.btn.primary:hover { background: var(--green-dark); border-color: var(--green-dark); }
+.btn.outline { background: transparent; color: var(--green); border-color: var(--green); }
+.btn.outline:hover { background: var(--green-light); }
+.btn.sm { padding: 6px 14px; font-size: 0.82rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 1.2rem 1.4rem; margin-bottom: 1rem;
+}
+.score-wrap { display: flex; align-items: center; gap: 1.5rem; }
+.score-circle {
+  width: 72px; height: 72px; border-radius: 50%; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  font-weight: 700; font-size: 1.5rem; border: 3px solid;
+}
+.score-good { color: var(--green);  border-color: var(--green);  background: var(--green-light); }
+.score-mid  { color: var(--amber);  border-color: #f5c542;       background: var(--amber-light); }
+.score-low  { color: var(--red);    border-color: var(--red);    background: var(--red-light); }
+.score-sub  { font-size: .65rem; font-weight: 400; color: var(--muted); }
+.level-pill {
+  display: inline-block; font-size: .72rem; font-weight: 700;
+  padding: 2px 10px; border-radius: 20px; margin-bottom: 6px;
+  background: var(--green-light); color: var(--green-dark);
+}
+.assessment { font-size: .9rem; color: var(--muted); line-height: 1.6; }
+.correction { border-left: 3px solid var(--border); padding: 8px 14px; margin-bottom: 10px; }
+.orig  { font-size: .88rem; color: var(--red);   text-decoration: line-through; margin-bottom: 3px; }
+.fixed { font-size: .88rem; color: var(--green); font-weight: 600; margin-bottom: 5px; }
+.expl  { font-size: .83rem; color: var(--muted); line-height: 1.55; }
+.cat-pill {
+  display: inline-block; font-size: .7rem; font-weight: 700;
+  padding: 2px 9px; border-radius: 20px; margin-bottom: 7px; text-transform: capitalize;
+}
+.c-grammar    { background: #dbeafe; color: #1e40af; }
+.c-spelling   { background: #fef3c7; color: #92400e; }
+.c-word-order { background: #d1fae5; color: #065f46; }
+.c-article    { background: #fce7f3; color: #9d174d; }
+.c-verb       { background: #ede9fe; color: #5b21b6; }
+.c-vocabulary { background: #ffedd5; color: #9a3412; }
+.c-other      { background: #f3f4f6; color: #374151; }
+.stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 1.5rem; }
+.stat-box  {
+  background: var(--bg); border-radius: var(--radius);
+  padding: .9rem 1rem; text-align: center; border: 1px solid var(--border);
+}
+.stat-n { font-size: 1.8rem; font-weight: 700; color: var(--green-dark); }
+.stat-l { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 2px; }
+.bar-row   { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+.bar-lbl   { font-size: .82rem; color: var(--muted); min-width: 90px; text-transform: capitalize; }
+.bar-track { flex: 1; height: 8px; background: var(--bg); border-radius: 4px; overflow: hidden; border: 1px solid var(--border); }
+.bar-fill  { height: 100%; border-radius: 4px; transition: width .7s ease; }
+.bar-cnt   { font-size: .82rem; font-weight: 600; min-width: 22px; text-align: right; }
+.hist-row  {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 9px 0; border-bottom: 1px solid var(--border); font-size: .875rem;
+}
+.hist-row:last-child { border-bottom: none; }
+.hist-date { color: var(--hint); font-size: .8rem; }
+.section-lbl {
+  font-size: .72rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .07em; color: var(--hint); margin-bottom: 10px;
+}
+.empty { text-align: center; padding: 3rem 1rem; color: var(--muted); font-size: .9rem; }
+.success-msg { font-size: .9rem; color: var(--green); font-weight: 500; }
+.error-msg   { font-size: .88rem; color: var(--red); line-height: 1.7; }
+.loading {
+  display: flex; align-items: center; gap: 10px;
+  padding: 2rem 0; color: var(--muted); font-size: .9rem;
+}
+.dots span { display: inline-block; animation: blink 1.3s infinite; font-size: 1.1rem; }
+.dots span:nth-child(2) { animation-delay: .22s; }
+.dots span:nth-child(3) { animation-delay: .44s; }
+@keyframes blink { 0%,80%,100%{opacity:.1} 40%{opacity:1} }
+.clear-link { font-size: .8rem; color: var(--hint); background: none; border: none; cursor: pointer; padding: 0; }
+.clear-link:hover { color: var(--red); }
+.top-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>🇳🇱 Dutch Journal Trainer</h1>
+    <p>Write daily journal entries in Dutch — get AI corrections and track your mistakes over time.</p>
+  </header>
+
+  <div id="apiBanner" class="banner">
+    ⚠️ <strong>API key missing.</strong> Open this file in a text editor, find
+    <code>YOUR_OPENROUTER_KEY_HERE</code> and replace it with your free key from
+    <a href="https://openrouter.ai/keys" target="_blank">openrouter.ai/keys</a>
+    (no credit card needed).
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="showTab('journal')">✏️ Journal</button>
+    <button class="tab" onclick="showTab('results')">📋 Analysis</button>
+    <button class="tab" onclick="showTab('stats')">📊 Progress</button>
+  </div>
+
+  <div id="tab-journal" class="panel active">
+    <label class="field-label">Today's entry (write in Dutch)</label>
+    <textarea id="journalInput"
+      placeholder="Vandaag was het een mooie dag. Ik ben naar de markt gegaan en heb veel lekker eten gekocht. Het weer was zonnig en ik heb mijn buurman gesproken..."></textarea>
+    <div class="row">
+      <span class="word-count" id="wordCount"></span>
+      <button class="btn primary" id="analyzeBtn" onclick="analyzeEntry()">Analyze entry →</button>
+    </div>
+  </div>
+
+  <div id="tab-results" class="panel">
+    <div id="resultsContent">
+      <div class="empty">Submit a journal entry to see your analysis here.</div>
+    </div>
+  </div>
+
+  <div id="tab-stats" class="panel">
+    <div id="statsContent"></div>
+  </div>
+
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+//  CONFIG — paste your key from openrouter.ai/keys (free, no card)
+// ════════════════════════════════════════════════════════════
+const OPENROUTER_KEY = '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';
+const MODEL = 'meta-llama/llama-3.3-70b-instruct:free';
+// ════════════════════════════════════════════════════════════
+
+const MISTAKES_KEY = 'dutch_mistakes_v2';
+const HISTORY_KEY  = 'dutch_history_v2';
+const LOG_KEY      = 'dutch_log_v2';
+
+function load(key, fallback) {
+  try { return JSON.parse(localStorage.getItem(key)) ?? fallback; } catch { return fallback; }
+}
+function save(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+
+document.addEventListener('DOMContentLoaded', () => {
+  if (OPENROUTER_KEY === 'YOUR_OPENROUTER_KEY_HERE') {
+    document.getElementById('apiBanner').style.display = 'block';
+  }
+  document.getElementById('journalInput').addEventListener('input', function () {
+    const n = this.value.trim().split(/\s+/).filter(Boolean).length;
+    document.getElementById('wordCount').textContent = n ? n + ' words' : '';
+  });
+});
+
+function showTab(name) {
+  ['journal', 'results', 'stats'].forEach((t, i) => {
+    document.querySelectorAll('.tab')[i].classList.toggle('active', t === name);
+    document.getElementById('tab-' + t).classList.toggle('active', t === name);
+  });
+  if (name === 'stats') renderStats();
+}
+
+function buildPrompt(text) {
+  return `You are a Dutch language teacher. Analyze the Dutch journal entry below written by a learner.
+
+Your response must be ONLY a valid JSON object. No markdown, no code fences, no text before or after the JSON.
+
+Use exactly this structure:
+{
+  "score": <integer 0-100>,
+  "level": "<A1|A2|B1|B2|C1|C2>",
+  "assessment": "<2-3 encouraging sentences in English about the overall quality>",
+  "corrections": [
+    {
+      "original": "<the exact incorrect phrase copied from the text>",
+      "corrected": "<the correct version>",
+      "explanation": "<1-2 sentence explanation in English>",
+      "category": "<one of: grammar, spelling, word order, article, verb, vocabulary, other>"
+    }
+  ]
+}
+
+Rules:
+- score = overall correctness and fluency (100 = perfect native Dutch)
+- List at most 8 of the most important corrections
+- If the entry has no mistakes, return corrections as an empty array []
+- category must be exactly one of the listed values in lowercase
+
+Dutch journal entry to analyze:
+${text}`;
+}
+
+function extractJSON(raw) {
+  try { return JSON.parse(raw.trim()); } catch {}
+  const stripped = raw.replace(/^```(?:json)?[\r\n]*/i, '').replace(/[\r\n]*```\s*$/,'').trim();
+  try { return JSON.parse(stripped); } catch {}
+  const start = raw.indexOf('{');
+  const end   = raw.lastIndexOf('}');
+  if (start !== -1 && end > start) {
+    try { return JSON.parse(raw.slice(start, end + 1)); } catch {}
+  }
+  throw new Error('Could not parse a valid JSON response from the model. Please try again.');
+}
+
+async function analyzeEntry() {
+  const text = document.getElementById('journalInput').value.trim();
+  if (!text) { alert('Please write something in Dutch first.'); return; }
+  if (OPENROUTER_KEY === 'YOUR_OPENROUTER_KEY_HERE') {
+    alert('Add your OpenRouter API key first — see the yellow notice at the top of the page.');
+    return;
+  }
+
+  document.getElementById('analyzeBtn').disabled = true;
+  showTab('results');
+  document.getElementById('resultsContent').innerHTML =
+    '<div class="loading"><div class="dots"><span>●</span><span>●</span><span>●</span></div> Analyzing your Dutch…</div>';
+
+  let result;
+  try {
+    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${OPENROUTER_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': window.location.href,
+        'X-Title': 'Dutch Journal Trainer'
+      },
+      body: JSON.stringify({
+        model: MODEL,
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a Dutch language teacher. Always respond with only a valid raw JSON object. Never use markdown, code fences, or any text outside the JSON.'
+          },
+          {
+            role: 'user',
+            content: buildPrompt(text)
+          }
+        ],
+        temperature: 0.1,
+        max_tokens: 1500
+      })
+    });
+
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody?.error?.message || `HTTP error ${res.status}`);
+    }
+
+    const data = await res.json();
+    const raw  = data?.choices?.[0]?.message?.content ?? '';
+    if (!raw) throw new Error('Empty response received — please try again.');
+    result = extractJSON(raw);
+
+  } catch (err) {
+    document.getElementById('resultsContent').innerHTML = `
+      <div class="card">
+        <p class="error-msg">
+          <strong>Error:</strong> ${esc(err.message)}<br><br>
+          Common fixes:<br>
+          • Double-check your OpenRouter API key is pasted correctly in the file<br>
+          • Make sure you copied the full key from openrouter.ai/keys<br>
+          • Free tier allows 200 requests/day — try again tomorrow if exceeded<br>
+          • Check your internet connection and try again
+        </p>
+      </div>`;
+    document.getElementById('analyzeBtn').disabled = false;
+    return;
+  }
+
+  renderResults(result);
+  logSession(result);
+  document.getElementById('analyzeBtn').disabled = false;
+}
+
+function scoreClass(s) { return s >= 80 ? 'score-good' : s >= 55 ? 'score-mid' : 'score-low'; }
+function catClass(c) {
+  const map = { grammar:'c-grammar', spelling:'c-spelling', 'word order':'c-word-order', article:'c-article', verb:'c-verb', vocabulary:'c-vocabulary' };
+  return map[(c||'').toLowerCase()] || 'c-other';
+}
+
+function renderResults(r) {
+  const corrections = Array.isArray(r.corrections) ? r.corrections : [];
+  const sc = Number(r.score) || 0;
+  let html = `
+    <div class="card">
+      <div class="score-wrap">
+        <div class="score-circle ${scoreClass(sc)}">
+          ${sc}<span class="score-sub">/100</span>
+        </div>
+        <div>
+          <div class="level-pill">${esc(r.level || '')}</div>
+          <p class="assessment">${esc(r.assessment || '')}</p>
+        </div>
+      </div>
+    </div>`;
+  if (corrections.length === 0) {
+    html += `<div class="card"><p class="success-msg">✓ Geen fouten gevonden — uitstekend werk!</p></div>`;
+  } else {
+    html += `<div class="section-lbl" style="margin-top:1.25rem;">${corrections.length} correction${corrections.length > 1 ? 's' : ''} found</div>`;
+    corrections.forEach(c => {
+      html += `
+        <div class="card">
+          <span class="cat-pill ${catClass(c.category)}">${esc(c.category || 'other')}</span>
+          <div class="correction">
+            <div class="orig">${esc(c.original)}</div>
+            <div class="fixed">→ ${esc(c.corrected)}</div>
+            <div class="expl">${esc(c.explanation)}</div>
+          </div>
+        </div>`;
+    });
+  }
+  document.getElementById('resultsContent').innerHTML = html;
+}
+
+function logSession(result) {
+  const corrections = Array.isArray(result.corrections) ? result.corrections : [];
+  const today = new Date().toISOString().slice(0, 10);
+  const hist = load(HISTORY_KEY, []);
+  const sessionNum = (hist[0]?.session || 0) + 1;
+
+  const db = load(MISTAKES_KEY, {});
+  corrections.forEach(c => { const cat = (c.category||'other').toLowerCase(); db[cat] = (db[cat]||0)+1; });
+  save(MISTAKES_KEY, db);
+
+  hist.unshift({ date: today, score: result.score||0, count: corrections.length, session: sessionNum });
+  save(HISTORY_KEY, hist.slice(0, 100));
+
+  const log = load(LOG_KEY, []);
+  corrections.forEach(c => {
+    log.push({ date:today, session:sessionNum, score:result.score||0,
+      category:(c.category||'other').toLowerCase(),
+      original:c.original||'', corrected:c.corrected||'', explanation:c.explanation||'' });
+  });
+  save(LOG_KEY, log.slice(0, 2000));
+}
+
+const barColors = { grammar:'#378ADD', spelling:'#BA7517', 'word order':'#1D9E75', article:'#D4537E', verb:'#7F77DD', vocabulary:'#D85A30', other:'#888780' };
+
+function renderStats() {
+  const db   = load(MISTAKES_KEY, {});
+  const hist = load(HISTORY_KEY, []);
+  const total = Object.values(db).reduce((a,b)=>a+b, 0);
+  if (total === 0 && hist.length === 0) {
+    document.getElementById('statsContent').innerHTML = '<div class="empty">Complete your first journal analysis to start tracking mistakes.</div>';
+    return;
+  }
+  const sorted   = Object.entries(db).sort((a,b)=>b[1]-a[1]);
+  const maxCount = sorted[0]?.[1] || 1;
+  const avgScore = hist.length ? Math.round(hist.reduce((a,b)=>a+(b.score||0),0)/hist.length) : 0;
+  const bars = sorted.map(([cat,count]) => {
+    const pct = Math.round((count/maxCount)*100);
+    const col = barColors[cat]||'#888780';
+    return `<div class="bar-row"><div class="bar-lbl">${cat}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${col};"></div></div><div class="bar-cnt" style="color:${col};">${count}</div></div>`;
+  }).join('');
+  const rows = hist.slice(0,10).map(h =>
+    `<div class="hist-row"><span>${h.count} correction${h.count!==1?'s':''} <span style="color:var(--hint);font-size:.78rem;">· score: ${h.score}</span></span><span class="hist-date">${h.date}</span></div>`
+  ).join('');
+  document.getElementById('statsContent').innerHTML = `
+    <div class="stat-grid">
+      <div class="stat-box"><div class="stat-n">${total}</div><div class="stat-l">Total mistakes</div></div>
+      <div class="stat-box"><div class="stat-n">${hist.length}</div><div class="stat-l">Sessions</div></div>
+      <div class="stat-box"><div class="stat-n">${avgScore}</div><div class="stat-l">Avg score</div></div>
+    </div>
+    ${sorted.length ? `<div class="section-lbl">Mistake breakdown</div><div style="margin-bottom:1.75rem;">${bars}</div>` : ''}
+    <div class="top-row">
+      <div class="section-lbl" style="margin:0;">Recent sessions</div>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <button class="btn outline sm" onclick="downloadExcel()">⬇ Download Excel</button>
+        <button class="clear-link" onclick="clearData()">Clear data</button>
+      </div>
+    </div>
+    <div>${rows||'<p style="font-size:.85rem;color:var(--hint);">No sessions yet.</p>'}</div>`;
+}
+
+function downloadExcel() {
+  const log  = load(LOG_KEY, []);
+  const hist = load(HISTORY_KEY, []);
+  if (log.length===0 && hist.length===0) { alert('No data to export yet. Analyze some entries first!'); return; }
+  const wb = XLSX.utils.book_new();
+
+  const logWS = XLSX.utils.aoa_to_sheet([
+    ['Date','Session #','Score','Category','Original (incorrect)','Corrected','Explanation'],
+    ...log.map(r=>[r.date,r.session,r.score,r.category,r.original,r.corrected,r.explanation])
+  ]);
+  logWS['!cols']=[{wch:12},{wch:11},{wch:8},{wch:14},{wch:32},{wch:32},{wch:48}];
+  XLSX.utils.book_append_sheet(wb, logWS, 'Error Log');
+
+  const db=load(MISTAKES_KEY,{});
+  const cats=['grammar','spelling','word order','article','verb','vocabulary','other'];
+  const totalM=Object.values(db).reduce((a,b)=>a+b,0);
+  const summWS=XLSX.utils.aoa_to_sheet([
+    ['Category','Total mistakes','% of total'],
+    ...cats.map(c=>{const n=db[c]||0;return[c,n,totalM>0?(n/totalM*100).toFixed(1)+'%':'0%'];}),
+    ['TOTAL',totalM,'100%']
+  ]);
+  summWS['!cols']=[{wch:16},{wch:16},{wch:14}];
+  XLSX.utils.book_append_sheet(wb,summWS,'Category Summary');
+
+  const histWS=XLSX.utils.aoa_to_sheet([
+    ['Date','Session #','Score','Mistakes in session'],
+    ...[...hist].reverse().map(h=>[h.date,h.session,h.score,h.count])
+  ]);
+  histWS['!cols']=[{wch:12},{wch:11},{wch:8},{wch:20}];
+  XLSX.utils.book_append_sheet(wb,histWS,'Session History');
+
+  const byDate={};
+  log.forEach(r=>{if(!byDate[r.date])byDate[r.date]={};byDate[r.date][r.category]=(byDate[r.date][r.category]||0)+1;});
+  const pivotWS=XLSX.utils.aoa_to_sheet([
+    ['Date',...cats,'Total'],
+    ...Object.entries(byDate).sort().map(([date,counts])=>{const row=cats.map(c=>counts[c]||0);return[date,...row,row.reduce((a,b)=>a+b,0)];})
+  ]);
+  pivotWS['!cols']=[{wch:12},...cats.map(()=>({wch:13})),{wch:8}];
+  XLSX.utils.book_append_sheet(wb,pivotWS,'Mistakes by Date');
+
+  XLSX.writeFile(wb,`dutch_mistakes_${new Date().toISOString().slice(0,10)}.xlsx`);
+}
+
+function clearData() {
+  if (confirm('Delete ALL mistake history and session data? This cannot be undone.')) {
+    [MISTAKES_KEY,HISTORY_KEY,LOG_KEY].forEach(k=>localStorage.removeItem(k));
+    renderStats();
+  }
+}
+
+function esc(s) {
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
